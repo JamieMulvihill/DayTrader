@@ -1,6 +1,6 @@
 import pandas as pd
-import robin_stocks.helper as helper
-import robin_stocks.urls as urls
+import robin_stocks.robinhood as robinhood
+
 
 class trader():
     def __init__(self, stocks):
@@ -16,10 +16,77 @@ class trader():
         span_interval = {'day': '5minute', 'week': '10minute', 'month': 'hour', '3month': 'hour', 'year': 'day', '5year': 'week'}
         interval = span_interval[span]
 
-        symbols = helper.inputs_to_set(stock)
-        url = urls.historicals()
-        payload = {'symbols' : ','.join(symbols), 'interval': interval, 'span': span, 'bounds': 'regular'}
+        data = robinhood.stocks.get_stock_historicals(
+            stock,
+            interval=interval,
+            span=span,
+            bounds='regular'
+            )   
 
-        data = helper.request_get(url, 'results', payload)
+        if data is not None and len(data) > 0: 
+            df = pd.DataFrame(data)
 
-        print('data: \n', data)
+            date_times = pd.to_datetime(df.loc[:, 'begins_at'])
+            close_prices = df.loc[:,'close_price'].astype('float')
+
+            df_price = pd.concat([close_prices, date_times], axis=1)
+            df_price = df_price.rename(columns={'close_price': stock})
+            df_price = df_price.set_index('begins_at')
+
+            return df_price
+
+            """ if 'begins_at' in df.columns and 'close_price' in df.columns:
+                # Convert 'begins_at' to datetime
+                df['begins_at'] = pd.to_datetime(df['begins_at'])
+
+                # Convert 'close_price' to float
+                df['close_price'] = df['close_price'].astype(float)
+
+                # Create a DataFrame with only the relevant columns
+                df_price = df[['close_price', 'begins_at']]
+
+                # Rename columns for clarity
+                df_price = df_price.rename(columns={'close_price': stock})
+
+                # Set 'begins_at' as the index
+                df_price = df_price.set_index('begins_at')
+
+                print('data: \n', df_price)
+                return df_price
+            else:
+                print("Required columns ('begins_at', 'close_price') are missing in the data.")
+
+        else:
+            print("No data received or data is empty.") """
+        
+        return None
+
+
+    def get_sma(self, stock, df_prices, window=12):
+        sma = df_prices.rolling(window=window, min_periods=window).mean()
+        sma = round(float(sma[stock].iloc[-1]), 4)
+        return sma
+    
+    def get_price_sma(self, price, sma):
+        price_sma = round(price/sma, 4)
+        print('Price_sma:', price_sma)
+        return price_sma
+    
+    def trade_option(self, stock, price):
+        if self.run_time % 5 == 0:
+            df_historical_prices = self.get_historical_prices(stock, span='day')
+            self.sma_hour[stock] = self.get_sma(stock, df_historical_prices[-12:], window=12)
+
+        self.price_sma_hour[stock] = self.get_price_sma(price, self.sma_hour[stock])
+        p_sma = self.price_sma_hour[stock]
+
+        indicator = "BUY" if self.price_sma_hour[stock] < 1.0 else "SELL" if self.price_sma_hour[stock] > 1.0 else "NONE"
+
+        if indicator == "BUY":
+            trade = "BUY"
+        elif indicator == "SELL":
+            trade = "SELL"
+        else:
+            trade = "HOLD"
+
+        return trade

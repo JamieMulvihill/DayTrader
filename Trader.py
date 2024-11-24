@@ -103,6 +103,21 @@ def get_holdings_and_bought_price(stocks):
 
     return(holdings, bought_price)
 
+def sell(stock, holdings, price):
+    sell_price = round((price*.98), 2)
+    print('### Trying to SELL {} at ${}'.format(stock, price))
+
+    if stock != 'VSAT':
+        print('not a vsat can sell ')
+        sell_order = robinhood.orders.order_sell_limit(symbol = stock, quantity=1, limitPrice=sell_price, timeInForce='gfd')
+        
+
+def buy(stock, allowable_holdings):
+    buy_price = round((price +.10), 2)
+    buy_order = robinhood.orders.order_buy_limit(symbol = stock, quantity=1, limitPrice=buy_price, timeInForce='gfd')
+
+    print('### Trying to BUY {} at ${}'.format(stock, price))
+
 if __name__ == "__main__":
     print('Running')
     if not login(days=6):
@@ -135,10 +150,10 @@ if __name__ == "__main__":
                 if trade == 'BUY':
                     allowable_holdings = int((cash/10)/price)
                     if allowable_holdings > 5 and holdings[stock] == 0:
-                        print('### Trying to BUY {} at ${}'.format(stock, price))
+                        buy(stock, allowable_holdings)
                 elif trade == 'SELL':
                     if holdings[stock] > 0:
-                        print('### Trying to SELL {} at ${}'.format(stock, price))
+                        sell(stock, holdings, price)
 
 
             time.sleep(15)

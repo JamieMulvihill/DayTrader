@@ -8,9 +8,6 @@ import time
 
 def login(days):
     time_logged_in = 60*60*24*days
-    #print(config.PASSWORD)
-    #print(config.USERNAME)
-    #robinhood.authentication.login(username=config.USERNAME, password=config.PASSWORD, expiresIn=time_logged_in, scope='internal', by_sms=True, store_session=True)
 
     try:
         login_response = robinhood.authentication.login(
@@ -82,6 +79,30 @@ def get_historical_prices(self, stock, span):
         print(f"Error getting historical data for {stock}: {str(e)}")
         return None
 
+def get_cash():
+    robinhood_cash = robinhood.account.build_user_profile()
+    print('Account:', robinhood_cash)
+
+    cash = float(robinhood_cash['cash'])
+    equity = float(robinhood_cash['equity'])
+
+    return(cash, equity)
+
+def get_holdings_and_bought_price(stocks):
+    holdings = {stocks[i]: 0 for i in range(0, len(stocks))}
+    bought_price = {stocks[i]: 0 for i in range(0, len(stocks))}
+    robinhood_holdings = robinhood.account.build_holdings()
+
+    for stock in stocks:
+        try:
+            holdings[stock] = int(float((robinhood_holdings[stock]['quantity'])))
+            bought_price[stock] = float((robinhood_holdings[stock]['average_buy_price']))
+        except:
+            holdings[stock] = 0
+            bought_price[stock] = 0
+
+    return(holdings, bought_price)
+
 if __name__ == "__main__":
     print('Running')
     if not login(days=6):
@@ -93,35 +114,33 @@ if __name__ == "__main__":
     stocks = get_stocks()
     print('stocks', stocks)
 
+    cash, equity = get_cash()
+
     ts = trade_strat_SMA.trader(stocks)
 
     while open_market():
         try:
             prices = robinhood.stocks.get_latest_price(stocks)
+            holdings, bought_price = get_holdings_and_bought_price(stocks)
+            print('holdings:', holdings)
+            print('bought_price:', bought_price)
 
             for i, stock in enumerate(stocks):
                 price = float(prices[i])
                 print('{} = ${}'.format(stock,price))
 
-                #price_data = ts.get_historical_prices(stock, span='day')
-                #sma = ts.get_sma(stock, price_data, window=12)
-                #print('sma', sma)
-                #price_sma = ts.get_price_sma(price, sma)
-                #print('price_sma', price_sma)
-                # Get historical data using robin_stocks built-in method
-                #data = robinhood.stocks.get_stock_historicals(
-                    #stock,
-                    #interval='5minute',
-                    #span='day',
-                    #bounds='regular'
-                #)
-                #if price_data is not None and not price_data.empty: 
-                    #print(f"Retrieved {len(price_data)} historical data points for {stock}")
-                #else:
-                    #print(f"No data or data is empty for {stock}")
-
                 trade = ts.trade_option(stock, price)
                 print('trade:', trade)
+
+                if trade == 'BUY':
+                    allowable_holdings = int((cash/10)/price)
+                    if allowable_holdings > 5 and holdings[stock] == 0:
+                        print('### Trying to BUY {} at ${}'.format(stock, price))
+                elif trade == 'SELL':
+                    if holdings[stock] > 0:
+                        print('### Trying to SELL {} at ${}'.format(stock, price))
+
+
             time.sleep(15)
 
         except Exception as e:

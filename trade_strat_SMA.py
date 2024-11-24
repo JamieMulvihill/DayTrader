@@ -34,30 +34,6 @@ class trader():
             df_price = df_price.set_index('begins_at')
 
             return df_price
-
-            """ if 'begins_at' in df.columns and 'close_price' in df.columns:
-                # Convert 'begins_at' to datetime
-                df['begins_at'] = pd.to_datetime(df['begins_at'])
-
-                # Convert 'close_price' to float
-                df['close_price'] = df['close_price'].astype(float)
-
-                # Create a DataFrame with only the relevant columns
-                df_price = df[['close_price', 'begins_at']]
-
-                # Rename columns for clarity
-                df_price = df_price.rename(columns={'close_price': stock})
-
-                # Set 'begins_at' as the index
-                df_price = df_price.set_index('begins_at')
-
-                print('data: \n', df_price)
-                return df_price
-            else:
-                print("Required columns ('begins_at', 'close_price') are missing in the data.")
-
-        else:
-            print("No data received or data is empty.") """
         
         return None
 

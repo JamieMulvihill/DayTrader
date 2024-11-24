@@ -1,6 +1,7 @@
 # Trader
 
 import config
+import trade_strat_SMA
 import robin_stocks.robinhood as robinhood
 import datetime as dt
 import time 
@@ -44,9 +45,15 @@ if __name__ == "__main__":
     stocks = get_stocks()
     print('stocks', stocks)
 
+    ts = trade_strat_SMA.trader(stocks)
+
     while open_market():
         prices = robinhood.stocks.get_latest_price(stocks)
-        print('prices', prices)
 
+        for i, stock in enumerate(stocks):
+            price = float(prices[i])
+            print('{} = ${}'.format(stock,price))
+
+            data = ts.get_historical_prices(stock, span='day')
 
         time.sleep(15)

@@ -52,6 +52,8 @@ class TradingSystem:
         stocks.append('VSAT')
         stocks.append('CETX')
         stocks.append('TSLA')
+        stocks.append('MMM')
+        stocks.append('AOS')
         return stocks
 
     def initialize(self):
@@ -69,8 +71,8 @@ class TradingSystem:
 
         if time_now > market_open and time_now < market_close:
             market = True
-        else:
-            print('Market Closed but fake open')
+        #else:
+            #print('Market Closed but fake open')
 
         return market
 
@@ -126,9 +128,10 @@ class TradingSystem:
                     
                 prices = robinhood.stocks.get_latest_price(self.trader.stocks)
                 holdings, bought_price = self.get_holdings_and_bought_price(self.trader.stocks)
-                print("passed the holdings getter")
 
-                for i, stock in enumerate(self.trader.stocks):
+                for i, stock in enumerate(self.trader.stock_universe):
+                    print(i)
+                    print(float(prices[i]))
                     self.process_single_stock(stock, float(prices[i]), holdings)
                     
                 time.sleep(5)
@@ -140,16 +143,26 @@ class TradingSystem:
 
     def process_single_stock(self, stock, price, holdings):
         # Check existing positions first
-        if holdings[stock] > 0:
+        print(stock)
+        if holdings.get(stock, 0) > 0:
             self.manage_existing_position(stock, price, holdings)
             return
-            
+        
         # New position entry logic
         if self.trader.analyze_entry(stock, price, self.get_volume(stock)):
+            print("passed analyze entry")
+            cash_data = self.get_cash()
+            print(f"Cash data: {cash_data}")
+            if isinstance(cash_data, (list, tuple)) and len(cash_data) > 0:
+                cash = cash_data[0]
+            else:
+                print(f"Invalid cash data: {cash_data}")
+                cash = 0  # Default or error handling
             position_size = self.risk_manager.calculate_position_size(
                 stock, 
                 price, 
-                self.get_cash()[0]
+                #self.get_cash()[0]
+                cash_data[0]
             )
             if position_size > 0:
                 self.place_new_trade(stock, price, position_size)
@@ -162,19 +175,40 @@ class TradingSystem:
             span='day',
             bounds='regular'
         )
+        print("getting volume")
         if historical and len(historical) > 0:
             return float(historical[-1]['volume'])
         return 0
     
     def manage_existing_position(self, stock, price, holdings):
         # Check if we should exit based on profit target or stop loss
+        print(f"In manage_existing_position for {stock}")
         entry_price = self.performance.get_entry_price(stock)
         if entry_price:
+            print(f"Entry price for {stock}: {entry_price}")
             pnl_pct = (price - entry_price) / entry_price
+            print(f"Current price: {price}, PnL Percentage: {pnl_pct * 100:.2f}%")
             
-            if (pnl_pct >= self.risk_manager.profit_target_pct or 
-                pnl_pct <= -self.risk_manager.stop_loss_pct):
+                # Check if we should exit based on profit target or stop loss
+            if pnl_pct >= self.risk_manager.profit_target_pct:
+                print(f"Target reached: {pnl_pct * 100:.2f}% >= {self.risk_manager.profit_target_pct * 100:.2f}%")
                 self.exit_position(stock, price, holdings[stock])
+            elif pnl_pct <= -self.risk_manager.stop_loss_pct:
+                print(f"Stop loss reached: {pnl_pct * 100:.2f}% <= -{self.risk_manager.stop_loss_pct * 100:.2f}%")
+                self.exit_position(stock, price, holdings[stock])
+            else:
+                print("No exit condition met.")
+        else:
+            #If no entry price is found, let's attempt to retrieve or set one
+            print(f"Entry price for {stock} not found. Attempting to set it.")
+            
+            # Get the current price as the entry price for the first trade
+            entry_price = price
+            self.performance.log_trade(stock, entry_price, 0, holdings[stock], dt.datetime.now())  # Log as open position
+            print(f"Entry price set for {stock}: {entry_price}")
+
+            # Now, re-check if we should exit
+            self.manage_existing_position(stock, price, holdings)  # Recursive call to check exit conditions after setting the entry price
 
     def place_new_trade(self, stock, price, position_size):
         entry, stop, target = self.risk_manager.get_order_prices(price, 'BUY')
@@ -186,17 +220,18 @@ class TradingSystem:
         #     limitPrice=entry,
         #     timeInForce='gfd'
         # )
-        self.performance.log_entry(stock, entry, position_size)
+        #self.performance.log_entry(stock, entry, position_size)
+        self.performance.log_trade(stock, entry, 0, stock, price)
 
     def exit_position(self, stock, price, shares):
         print(f"Exiting position in {stock} at {price}")
         # Uncomment when ready to trade real money
-        # order = robinhood.orders.order_sell_limit(
-        #     symbol=stock,
-        #     quantity=shares,
-        #     limitPrice=price,
-        #     timeInForce='gfd'
-        # )
+        order = robinhood.orders.order_sell_limit(
+             symbol=stock,
+             quantity=shares,
+             limitPrice=price,
+             timeInForce='gfd'
+         )
         self.performance.log_exit(stock, price, shares)
     
 def main():

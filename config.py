@@ -1,4 +1,4 @@
 #Initial Set up of Day trader
 
-USERNAME = ""
-PASSWORD = ""
+USERNAME = "jamiemulvihill@live.com"
+PASSWORD = "@Mulvij1991"
